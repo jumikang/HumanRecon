@@ -50,7 +50,7 @@ class DeepHumanUVNet(pl.LightningModule):
         super(DeepHumanUVNet, self).__init__()
         self.model = BaseModule(return_uv=opt.data.return_uv,
                                 return_disp=opt.data.return_disp)
-        self.automatic_optimization = False
+        self.automatic_optimization = True
         self.loss = LossBuilderHumanUV(opt=opt)
         self.learning_rate = 0.001  # opt.learning_rate
         self.log_every_t = 200  # opt.log_every_n_steps
@@ -68,8 +68,7 @@ class DeepHumanUVNet(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         input = torch.cat((train_batch['image_cond'], train_batch['uv_cond']), dim=1)
-        #opt = self.optimizers()
-        opt = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        opt = self.optimizers(self.automatic_optimization)
         sch = self.lr_schedulers()
         # opt, sch = self.configure_optimizers
         opt.zero_grad()
@@ -86,7 +85,7 @@ class DeepHumanUVNet(pl.LightningModule):
         # step at the last bach of each epoch.
         #if self.trainer.is_last_batch:
         sch.step()
-
+        
         logs = {'train_loss': train_loss}
         if batch_idx % self.log_every_t == 0:
             log_dict['input'] = input[0, :3]
