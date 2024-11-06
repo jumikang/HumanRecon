@@ -1,0 +1,42 @@
+
+# SMPL related paths and data
+SMPL:
+#  smpl_root: '/mnt/DATASET8T/home/jumi/Workspace/uv_unwrapper/resource'
+  smpl_root: '/home/recon/Workspace/uv_recon_ces_jumi/resource'
+  segmentation: 'body_segmentation/smplx/smplx_vert_segmentation.json'
+  uv_mapper: 'smpl_uv_table.json'
+
+# data path and configurations
+DATA:
+  data_root: './'
+
+# rendering parameters
+RENDER:
+  max_mip_level: 9
+  angles: 10  # for every 15 degrees
+  resolution_render: 1024
+  resolution_texture: 1024
+
+# optimization parameters for differential rendering
+OPT:
+  max_iter: 100000
+  log_interval: 100
+  lr_base: 1e-3
+
+# intrinsic parameters to render images
+CAM:
+  width: 1024
+  height: 1024
+  near: 1
+  far: 600
+  fx: 1448.15468787
+  fy: 1448.15468787
+  px: 512.0
+  py: 512.0
+  scale: 1.0
+  distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
+  projection: perspective
+  cam_center: [0, 0, 300]
+  h_interval: [0]
+  view_angle: [0, 360, 10]
+  pitch: [-10, 11, 10]

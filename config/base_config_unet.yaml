@@ -1,0 +1,34 @@
+
+exp: 'uv_ces'
+model:
+  pretrained_model: None # "runwayml/stable-diffusion-v1-5"
+
+data:
+  root_dir: "/home/recon/data/DATASET_2024"
+#  root_dir: "/mnt/DATASET8T/home/jumi/DATASET/TRAIN_UV_TEST"
+  return_uv: true
+  return_disp: false
+  pred_canon: true
+  dr_loss: true
+  res: 512
+  h_interval: [0, 90, 180, 270]
+  v_interval: [0]
+  train:
+    data_list: 'list/CES_TRAIN.json'
+    batch_size: 24
+    num_workers: 12
+  validation:
+    data_list: 'list/CES_VAL.json'
+    batch_size: 1
+    num_workers: 1
+
+train:
+  prediction_type: 'epsilon'
+  is_continue: false
+  print_every_t: 1000
+  log_every_t: 200
+  timesteps: 1000
+  epochs: 100
+  val_every_n_epoch: 10
+  log_every_n_epoch: 1
+  lr: 1e-03

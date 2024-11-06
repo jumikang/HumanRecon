@@ -1,0 +1,31 @@
+
+exp: 'uv_diffusion'
+model:
+  pretrained_model: "runwayml/stable-diffusion-v1-5"
+
+data:
+  root_dir: "/home/mpark/data/IOYS_Famoz/DATASET_2024"
+#  root_dir: "/home/recon/DATASET_2024"
+#  root_dir: "/home/server250/DATASET_2024"
+  return_disp: false
+  res: 256
+  train:
+    data_list: 'list/DIFFUSION_RP.json'
+    batch_size: 1
+    num_workers: 1
+  validation:
+    data_list: 'list/DIFFUSION_VAL.json'
+    batch_size: 1
+    num_workers: 1
+
+train:
+  prediction_type: 'epsilon'
+  is_continue: false
+  lr: 1e-04
+  epochs: 50
+  timesteps: 1000
+  val_every_n_epoch: 1
+  log_every_n_steps: 100
+  log_every_t: 100
+  log_every_t_val: 2
+
