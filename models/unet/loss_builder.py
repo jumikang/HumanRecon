@@ -2,6 +2,9 @@ import torch
 import yaml
 import trimesh
 import smplx
+import os
+import cv2
+import pickle
 import torch.nn as nn
 import numpy as np
 import torchvision
@@ -14,8 +17,9 @@ from diff_renderer.diff_optimizer import DiffOptimizer
 from diff_renderer.diff_optimizer import Renderer
 from diff_renderer.normal_nds.nds.core.mesh_ext import TexturedMesh
 from diff_renderer.normal_nds.nds.core.mesh_smpl import SMPLMesh
+from diff_renderer.normal_nds.nds.losses import laplacian_loss
 from smpl_optimizer.smpl_wrapper import BaseWrapper
-from utils.visualizer import to_trimesh
+
 import torchvision.transforms as transforms
 import warnings
 warnings.filterwarnings('ignore')
@@ -87,6 +91,12 @@ class LossBank:
         self.ssim_ch3 = SSIM(data_range=1.0, size_average=True,
                              nonnegative_ssim=True, channel=3, win_size=5)
         # self.ms_ssim = MultiScaleStructuralSimilarityIndexMeasure(data_range=1.0)
+
+    def tv_loss(self, img):
+        xv = img[1:, :, :] - img[:-1, :, :]
+        yv = img[:, 1:, :] - img[:, :-1, :]
+        loss = torch.mean(abs(xv)) + torch.mean(abs(yv))
+        return loss
 
     # l1 loss
     def get_l1_loss(self, pred, target):
@@ -203,7 +213,7 @@ class LossBuilderHumanUV(LossBank):
         self.RGB_STD = torch.Tensor([0.229, 0.224, 0.225]) # vgg std
         self.resize_transform = transforms.Resize(self.res)
 
-        path2config = '/home/recon/Workspace/uv_recon_ces_jumi/config/exp_config.yaml'
+        path2config = '/mnt/DATASET8T/home/jumi/Workspace/uv_recon_ces/config/exp_config.yaml'
         with open(path2config, 'r') as f:
             params = yaml.load(f, Loader=yaml.FullLoader)
         self.params = params
@@ -219,7 +229,7 @@ class LossBuilderHumanUV(LossBank):
                                     'depth': False,
                                     'normal': True,
                                     'mask': False,
-                                    'offset': False}
+                                    'offset': True}
         self.use_opengl = True
         self.glctx = dr.RasterizeGLContext() if self.use_opengl else dr.RasterizeCudaContext()
         self.cameras = None
@@ -230,7 +240,7 @@ class LossBuilderHumanUV(LossBank):
         output_log = dict()
         w = [0.9, 0.1]
         w_dr = [0.8, 0.1]
-        # permute = [2, 1, 0]
+
         render_pred_img = []
         render_pred_normal = []
         tex_color = []
@@ -240,6 +250,7 @@ class LossBuilderHumanUV(LossBank):
         if self.opt.data.return_disp:
             tgt_disp = target_var['disp_target']
             pred_disp = torch.zeros_like(tgt_disp)
+            pred_disp_img = []
             # pred_uv = torch.zeros_like(tgt_disp)
             # gt_uv = torch.zeros_like(tgt_disp)
             for bat in range(batch):
@@ -247,6 +258,7 @@ class LossBuilderHumanUV(LossBank):
                 disp = self.diffopt.uv_sampling(pred_disp_[0].permute(1, 2, 0), target_var['smpl_uv_vts'][bat])
                 disp = disp.permute(1, 0)[None, :, :]
                 pred_disp[bat] = disp
+                pred_disp_img.append(pred_disp_)
             total_loss += w[0] * self.get_loss(pred_disp, tgt_disp, loss_type='l2')
             total_loss += w[1] * self.get_loss(pred_disp, tgt_disp, loss_type='cos')
 
@@ -287,13 +299,13 @@ class LossBuilderHumanUV(LossBank):
             for bat in range(batch):
                 smpl_params = BaseWrapper.load_params(target_var["smpl_param_path"][bat])
                 smplx_model = smplx.create(
-                    model_path='/home/recon/Workspace/uv_recon_ces_jumi/resource/smpl_models',
+                    model_path='/mnt/DATASET8T/home/jumi/Workspace/uv_recon_ces/resource/smpl_models',
                     model_type='smplx',
                     gender=smpl_params['gender'],
                     num_betas=10,
                     ext='npz',
                     use_face_contour=True,
-                    flat_hand_mean=True,
+                    flat_hand_mean=False,
                     use_pca=True,
                     use_pca_comps=6).to(self.device)
                 scan_smpl_mesh = SMPLMesh(vertices=(target_var['smpl_vertices'][bat]
@@ -301,11 +313,12 @@ class LossBuilderHumanUV(LossBank):
                                           indices=target_var['smpl_faces'][bat],
                                           uv_vts=target_var['smpl_uv_vts'][bat])
                 scan_smpl_mesh.smpl_model = smplx_model
+                scan_smpl_mesh.forward_smpl(smpl_params)
                 scan_smpl_mesh.lbs_weights = target_var['lbs_weights'][bat]
                 scan_smpl_mesh.A = target_var['A'][bat]
                 v_deformed = scan_smpl_mesh.forward_skinning(smpl_params, scan_smpl_mesh.vertices[None, :, :])
 
-                # np_tex = np.flipud(np.asarray(tex_color[bat][:, :, [2, 1, 0]]))
+                # np_tex = np.flipud(np.asarray(tex_color[bat]))
                 # texture = trimesh.visual.TextureVisuals(uv=(target_var['smpl_uv_vts'][bat]).detach().cpu().numpy(),
                 #                                         image=Image.fromarray(np.uint8(np_tex*255)).convert('RGB'))
                 # pred_mesh = trimesh.Trimesh(vertices=v_deformed.detach().cpu().numpy(),
@@ -314,6 +327,19 @@ class LossBuilderHumanUV(LossBank):
                 #                             validate=True,
                 #                             process=False)
                 # pred_mesh.export('pred.obj')
+
+                # if not os.path.isfile(target_var['pred_uv_path'][bat]) and 'pred_uv_path' in target_var:
+                #     filename = target_var['pred_uv_path'][bat].split('/')[-1]
+                #     dirname = target_var['pred_uv_path'][bat].replace('/%s' % filename, '/')
+                #     os.makedirs(dirname, exist_ok=True)
+                #     cv2.imwrite('%s' % target_var['pred_uv_path'][bat], np.uint8(np_tex * 255))
+                #
+                # if not os.path.isfile(target_var['pred_disp_path'][bat]) and 'pred_disp_path' in target_var:
+                #     filename = target_var['pred_disp_path'][bat].split('/')[-1]
+                #     dirname = target_var['pred_disp_path'][bat].replace('/%s' % filename, '/')
+                #     os.makedirs(dirname, exist_ok=True)
+                #     with open(target_var['pred_disp_path'][bat], "wb") as f:
+                #         pickle.dump(pred_disp[bat].detach().cpu().numpy(), f)
 
                 mesh_pred = TexturedMesh(v_deformed,
                                          target_var['smpl_faces'][bat],
@@ -327,8 +353,10 @@ class LossBuilderHumanUV(LossBank):
                 for camera in self.cameras:
                     render_pred.append(self.render.render(self.glctx, mesh_pred, camera,
                                                           self.render_options_smpl,
+                                                          verts_init=mesh_pred.vertices,
                                                           resolution=int(self.cameras[0].K[0, 2] * 2)))
 
+                self.diffopt.compute_seam(uv_vts=target_var['smpl_uv_vts'][bat])
                 for v in range(len(self.cameras)):
                     render_color = render_pred[v]["color"][0].permute(2, 0, 1)
                     render_normal = render_pred[v]["normal"].permute(2, 0, 1)
@@ -339,24 +367,25 @@ class LossBuilderHumanUV(LossBank):
                         render_pred_img.append(render_color)
                         render_pred_normal.append(render_normal)
 
-                    total_loss += w_dr[0] * self.get_loss(
-                        render_color.to(target_var['dr_imgs_target'][v][bat].device),
-                        target_var['dr_imgs_target'][v][bat], loss_type='l1')
-                    total_loss += w_dr[1] * self.get_loss(
-                        render_color.unsqueeze(0).to(target_var['dr_imgs_target'][v][bat].device),
-                        target_var['dr_imgs_target'][v][bat].unsqueeze(0),
-                        loss_type='vgg')
+                    total_loss += self.get_loss(render_color.to(target_var['dr_imgs_target'][v][bat].device),
+                                                target_var['dr_imgs_target'][v][bat], loss_type='l1') * w_dr[0]
+                    total_loss += self.get_loss(render_color.unsqueeze(0).to(target_var['dr_imgs_target'][v][bat].device),
+                                                target_var['dr_imgs_target'][v][bat].unsqueeze(0), loss_type='vgg') * w_dr[1]
+                    total_loss += self.get_loss(render_pred[v]["disp_uv"].permute(2, 0, 1),
+                                                render_pred[v]["disp_cv"].permute(2, 0, 1), loss_type='l2') * w_dr[1]
 
-                    total_loss += w_dr[0] * self.get_loss(
-                        render_normal.to(target_var['dr_normals_target'][v][bat].device),
-                        target_var['dr_normals_target'][v][bat], loss_type='l2')
-                    total_loss += w_dr[1] * self.get_loss(
-                        render_normal.unsqueeze(0).to(target_var['dr_normals_target'][v][bat].device),
-                        target_var['dr_normals_target'][v][bat].unsqueeze(0), loss_type='ssim')
-                    total_loss += w_dr[1] * self.get_loss(
-                        render_normal.unsqueeze(0).to(target_var['dr_normals_target'][v][bat].device),
-                        target_var['dr_normals_target'][v][bat].unsqueeze(0),
-                        loss_type='cos')
+                    total_loss += self.get_loss(render_normal.to(target_var['dr_normals_target'][v][bat].device),
+                                                target_var['dr_normals_target'][v][bat], loss_type='l2') * w_dr[0]
+                    total_loss += self.get_loss(render_normal.unsqueeze(0).to(target_var['dr_normals_target'][v][bat].device),
+                                                target_var['dr_normals_target'][v][bat].unsqueeze(0), loss_type='ssim') * w_dr[1]
+                    total_loss += self.get_loss(render_normal.unsqueeze(0).to(target_var['dr_normals_target'][v][bat].device),
+                                                target_var['dr_normals_target'][v][bat].unsqueeze(0), loss_type='cos') * w_dr[1]
+
+                    # seam loss
+                    total_loss += self.get_loss(mesh_pred.vertices[self.diffopt.seam[:, 0], :],
+                                                mesh_pred.vertices[self.diffopt.seam[:, 1], :], loss_type='l2')
+                    total_loss += self.tv_loss(pred_disp_img[bat][0].permute(1, 2, 0))
+                    total_loss += laplacian_loss(mesh_pred)
 
         # if 'disp' in pred_var:
         #     for bat in range(pred_var['disp'].shape[0]):
@@ -366,7 +395,6 @@ class LossBuilderHumanUV(LossBank):
         #         pred_disp[bat] = disp
         #     total_loss += w[0] * self.get_loss(pred_disp, tgt_disp, loss_type='l2')
         #     total_loss += w[1] * self.get_loss(pred_disp, tgt_disp, loss_type='cos')
-
         output_log['render_pred_img'] = render_pred_img
         output_log['render_pred_normal'] = render_pred_normal
         output_log['render_tgt_img'] = target_var['dr_imgs_target']
