@@ -57,8 +57,8 @@ cd HumanRecon
 ### 2. Installation
 ```bash
 # Create conda environment
-conda create -n magicman python=3.10
-conda activate magicman
+conda create -n humanRecon python=3.10
+conda activate humanRecon
 
 # Install PyTorch and other dependencies
 pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2
