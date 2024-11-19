@@ -2,12 +2,12 @@
 
   <h2 align="center">HumanRecon: UV texture map and Displacement Prediction based Iterative Refinement </h2>
   <p align="center">
-    <strong>Jumi Kang</strong></a><sup>1</sup>
+    <strong>Jumi Kang</strong></a><sup>1, 2</sup>
     · 
-    <strong>Mingyu Park</strong></a><sup>2</sup>
+    <strong>Mingyu Park</strong></a><sup>1, 2</sup>
     · 
     <br>
-    <sup>1</sup>Korea Electronics Technology Institute  &nbsp;&nbsp;&nbsp; <sup>2</sup>Human&Spatial Intelligence Lab &nbsp;&nbsp;&nbsp;
+    <sup>1</sup>Korea Electronics Technology Institute  &nbsp;&nbsp;&nbsp; <sup>2</sup>Polygome &nbsp;&nbsp;&nbsp;
     <br>
     </br>
   </p>
