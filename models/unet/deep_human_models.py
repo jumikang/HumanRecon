@@ -1,14 +1,17 @@
 from __future__ import print_function
-import math
+# import math
 import torchvision
 import torch.nn as nn
 import torch.utils.data
 import torch.optim as optim
 import pytorch_lightning as pl
-import numpy as np
-from models.unet.unet import ATUNet_UV, UNet, ATUNet
+# import numpy as np
+from models.unet.unet import ATUNet_UV, UNet#, ATUNet, ResUnetPlusPlus
 from models.unet.loss_builder import LossBuilderHumanUV
-
+# from models.MSPN_SDR.lib.model.resnet_cbam import resnet101_cbam
+# from models.MSPN_SDR.lib.model.NAFNet_arch import NAFNet
+# from models.resnet.resnet import ResNetEncoder
+# from models.resnet.decoder import Decoder
 
 class BaseModule(nn.Module):
     def __init__(self, im2d_in=6,
@@ -20,8 +23,14 @@ class BaseModule(nn.Module):
         self.return_disp = return_disp
         self.split_last = split_last
         if self.return_uv and self.return_disp:
-            self.uvFeature = ATUNet_UV(in_ch=im2d_in, out_ch=64, split_last=self.split_last)
-            self.uvFeature2uvd = ATUNet_UV(in_ch=(im2d_in + 64), out_ch=6, split_last=self.split_last)
+            # self.imuv2uvdisp = NAFNet(img_channel=3)
+            # self.imuv2uvdisp = ResUnetPlusPlus(channel=6)
+            # self.imuv2uvdisp_encoder = ResNetEncoder(in_channels=6)
+            # self.imuv2uv_disp_decoder = Decoder(channels=[512, 64, 8, 1, 6],
+            #                                     feature_channels=[2048, 256, 64, 6, 7])
+            # self.uvFeature = ATUNet_UV(in_ch=im2d_in, out_ch=64, split_last=self.split_last)
+            # self.uvFeature2uvd = ATUNet_UV(in_ch=(im2d_in + 64), out_ch=6, split_last=self.split_last)
+            self.imuv2uvdisp = ATUNet_UV(in_ch=im2d_in, out_ch=6, split_last=self.split_last)
         elif self.return_uv and not self.return_disp:
             self.imuv2uv = UNet(in_ch=6, out_ch=3)
         elif not self.return_uv and self.return_disp:
@@ -33,8 +42,11 @@ class BaseModule(nn.Module):
 
     def forward(self, x):
         if self.return_uv and self.return_disp:
-            _, f_uvd = self.uvFeature(x)
-            y_uvd, _ = self.uvFeature2uvd(torch.cat((x, f_uvd), dim=1))
+            # _, f_uvd = self.uvFeature(x)
+            # y_uvd, _ = self.uvFeature2uvd(torch.cat((x, f_uvd), dim=1))
+            # x4, x3, x2, x1, x0 = self.imuv2uvdisp_encoder(x)
+            # y_uvd = self.imuv2uv_disp_decoder(x4, x3, x2, x1, x0)
+            y_uvd, _ = self.imuv2uvdisp(x)
             output = {'uv': y_uvd[:, :3, :, :],
                       'disp': y_uvd[:, 3:, :, :]}
         elif self.return_uv and not self.return_disp:
@@ -53,10 +65,10 @@ class DeepHumanUVNet(pl.LightningModule):
         self.automatic_optimization = True
         self.loss = LossBuilderHumanUV(opt=opt)
         self.learning_rate = 0.001  # opt.learning_rate
-        self.log_every_t = 200  # opt.log_every_n_steps
+        self.log_every_t = 100  # opt.log_every_n_steps
         self.dr_loss = opt.data.dr_loss
-        self.use_amp = True
-        self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
+        # self.use_amp = True
+        # self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -67,25 +79,33 @@ class DeepHumanUVNet(pl.LightningModule):
         scheduler.step(epoch=self.current_epoch)
 
     def training_step(self, train_batch, batch_idx):
-        input = torch.cat((train_batch['image_cond'], train_batch['uv_cond']), dim=1)
-        opt = self.optimizers(self.automatic_optimization)
-        sch = self.lr_schedulers()
-        # opt, sch = self.configure_optimizers
-        opt.zero_grad()
-        with torch.cuda.amp.autocast():
-            pred_var = self.model(input)
-            train_loss, log_dict = self.loss.forward(pred_var, train_batch)
+        # input = torch.cat((train_batch['image_cond'], train_batch['uv_cond']), dim=1)
+        # opt = self.optimizers(self.automatic_optimization)
+        # sch = self.lr_schedulers()
+        # opt.zero_grad()
+        # with torch.cuda.amp.autocast():
+        #     pred_var = self.model(input)
+        #     train_loss, log_dict = self.loss.forward(pred_var, train_batch)
+        # self.scaler.scale(train_loss).backward(retain_graph=True)
+        # self.scaler.step(opt)
+        # self.scaler.update()
+        # sch.step()
 
-        # train_loss.backward(retain_graph=True)
-        self.scaler.scale(train_loss).backward(retain_graph=True)
+        input = torch.cat((train_batch['image_cond'], train_batch['uv_cond']), dim=1)
+        # opt = self.optimizers(self.automatic_optimization)
+        # sch = self.lr_schedulers()
+
+        pred_var = self.model(input)
+        train_loss, log_dict = self.loss.forward(pred_var, train_batch)
+
         # self.manual_backward(train_loss)
-        self.scaler.step(opt)
-        self.scaler.update()
+        # opt.step()
 
         # step at the last bach of each epoch.
-        #if self.trainer.is_last_batch:
-        sch.step()
-        
+        # if self.trainer.is_last_batch:
+        #     sch.step()
+        # opt.zero_grad()
+
         logs = {'train_loss': train_loss}
         if batch_idx % self.log_every_t == 0:
             log_dict['input'] = input[0, :3]
@@ -112,23 +132,9 @@ class DeepHumanUVNet(pl.LightningModule):
             return {'loss': test_loss}
 
     @torch.no_grad()
-    def in_the_wild_step(self, data):
+    def in_the_wild_step(self, input):
         self.model.eval()
-        RGB_MEAN = torch.FloatTensor(np.array([0.485, 0.456, 0.406])).view(1, 3, 1, 1)
-        RGB_STD = torch.FloatTensor(np.array([0.229, 0.224, 0.225])).view(1, 3, 1, 1)
-
-        image_cond = data['image_cond'] / 2.0 + 0.5
-        dense_cond = data['dense_cond'] / 2.0 + 0.5
-        image_cond = (image_cond - RGB_MEAN) / RGB_STD
-        dense_cond = (dense_cond - RGB_MEAN) / RGB_STD
-        input = torch.cat((image_cond, dense_cond), dim=1)
-
-        input256 = nn.functional.interpolate(input, (256, 256), mode='bilinear', align_corners=True)
-        output = self.model(input256)
-        tex_color = output["pred_uv"] * torch.Tensor(RGB_STD) + RGB_MEAN
-        tex_color_512 = nn.functional.interpolate(tex_color, (512, 512), mode='bilinear', align_corners=True)
-        return tex_color_512 * 2.0 - 1.0
-
+        return self.model(input)
 
     def make_summary(self, log_dict):
         log_list = []
@@ -166,17 +172,26 @@ class DeepHumanUVNet(pl.LightningModule):
         return input_color_grid
 
 
+# def weight_init_basic(m):
+#     if isinstance(m, nn.Conv2d):
+#         n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+#         m.weight.data.normal_(0, math.sqrt(2. / n))
+#     elif isinstance(m, nn.BatchNorm2d):
+#         m.weight.data.fill_(1)
+#         m.bias.data.zero_()
+#     return m
+
 def weight_init_basic(m):
     if isinstance(m, nn.Conv2d):
-        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-        m.weight.data.normal_(0, math.sqrt(2. / n))
+        nn.init.kaiming_uniform_(m.weight.data, nonlinearity='relu')
+        if m.bias is not None:
+            nn.init.constant_(m.bias.data, 0)
     elif isinstance(m, nn.BatchNorm2d):
-        m.weight.data.fill_(1)
-        m.bias.data.zero_()
+        nn.init.constant_(m.weight.data, 1)
+        nn.init.constant_(m.bias.data, 0)
     elif isinstance(m, nn.Linear):
-        m.bias.data.zero_()
-    return m
-
+        nn.init.kaiming_uniform_(m.weight.data)
+        nn.init.constant_(m.bias.data, 0)
 
 # for test
 if __name__ == '__main__':
