@@ -6,12 +6,13 @@ import warnings
 import pytorch_lightning as pl
 from omegaconf import OmegaConf
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.tuner import Tuner
 from dataset.loader_unet import create_dataset
 from models.unet.deep_human_models import DeepHumanUVNet
 warnings.filterwarnings('ignore')
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-@hydra.main(config_path="config", config_name="base_config_unet")
+@hydra.main(config_path="config", config_name="base_config_unet_train")
 def main(opt):
     pl.seed_everything(42)
     print("Working dir:", os.getcwd())
@@ -27,27 +28,27 @@ def main(opt):
     logger = TensorBoardLogger(save_dir='logs/', name=f"{opt.exp}")
     trainer = pl.Trainer(
         devices=-1,
-        precision='16',
+        precision=16,
         accelerator="auto",  # fsdp, ddp, auto
         callbacks=[checkpoint_callback],
+        accumulate_grad_batches=2,
         max_epochs=opt.train.epochs,
         check_val_every_n_epoch=opt.train.val_every_n_epoch,
         logger=logger,
         log_every_n_steps=opt.train.log_every_n_epoch,
-        strategy="auto",
+        strategy='ddp_find_unused_parameters_true',
         num_sanity_val_steps=0
     )
     print('cuda_id: %d' % trainer.local_rank)
     model = DeepHumanUVNet(opt)
-    trainset = create_dataset(opt.data, validation=False)
-    validset = create_dataset(opt.data, validation=True)
+    trainset = create_dataset(opt, validation=False)
+    validset = create_dataset(opt, validation=True)
 
     if opt.train.is_continue:
         checkpoint = sorted(glob.glob("checkpoints/epoch=*.ckpt"))[-1]
         trainer.fit(model, trainset, validset, ckpt_path=checkpoint)
     else:
         trainer.fit(model, trainset, validset)
-
 
 if __name__ == '__main__':
     torch.cuda.empty_cache()
