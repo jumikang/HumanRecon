@@ -17,7 +17,7 @@
 </div>
 
 <div align="left">
-  Figure 1. Given a reference human image in different poses, outfits, or styles (i.e. real and fictional characters) as input, <strong>MagicMan</strong> is able to generate consistent high-quality novel view images and normal maps, which are well-suited for downstream multi-view reconstruction applications.
+  Figure 1. Given a reference human image ~
 </div>
 
 
