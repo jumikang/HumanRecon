@@ -1,28 +1,81 @@
+<p align="center">
 
-# how to install (diffusion only)
-conda create -n diffusion python=3.9
-conda activate diffusion
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-pip install transformers datasets diffusers[torch]
-pip install omegaconf
-pip install kornia
-pip install hydra-core
-pip install tensorboard
-pip install pytorch-lightning
-pip install git+https://github.com/openai/CLIP.git
+  <h2 align="center">HumanRecon: UV texture map and Displacement Prediction based Iterative Refinement </h2>
+  <p align="center">
+    <strong>Jumi Kang</strong></a><sup>1</sup>
+    · 
+    <strong>Mingyu Park</strong></a><sup>2</sup>
+    · 
+    <br>
+    <sup>1</sup>Korea Electronics Technology Institute  &nbsp;&nbsp;&nbsp; <sup>2</sup>Human&Spatial Intelligence Lab &nbsp;&nbsp;&nbsp;
+    <br>
+    </br>
+  </p>
+    </p>
+<div align="center">
+  <img src="./assets/teaser.png" alt="HumanRecon: UV texture map and Displacement Prediction based Iterative Refinement" style="width: 80%; height: auto;"></a>
+</div>
 
-# how to install (+ differential rendering with uv unwrapping)
-pip install pytorch_msssim
-pip install trimesh
-pip install rembg
-pip install meshzoo
-pip install open3d
-pip install smplx
-pip install ninja
-pip install tbb
-pip install UVTextureConverter
-cd nvdiffrast & pip install .
-pip install git+https://github.com/facebookresearch/detectron2@main#subdirectory=projects/DensePose
+<div align="left">
+  Figure 1. Given a reference human image in different poses, outfits, or styles (i.e. real and fictional characters) as input, <strong>MagicMan</strong> is able to generate consistent high-quality novel view images and normal maps, which are well-suited for downstream multi-view reconstruction applications.
+</div>
 
-# in case of cuda conflict (force reinstall) - depending on which version of cuda is installed in your pc.
-pip install --upgrade --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+<div align="left">
+  <br>
+  This repository will contain the official implementation of <strong>HumanRecon</strong>.
+</div>
+
+
+## 📣 News & TODOs
+- [ ] **[2025.01.xx]** Release inference code and pretrained weights
+- [ ] **[2025.xx.xx]** Release paper and project page
+- [ ] Release reconstruction code.
+- [ ] Release training code.
+
+## 🧰 Models
+
+|Model        | Resolution|#Views    |GPU Memery<br>(w/ refinement)|#Training Scans|Datasets|
+|:-----------:|:---------:|:--------:|:--------:|:--------:|:--------:|
+|hr_v1        |512x512    |4         |10.0GB    |~2500     |[THuman2.1](https://github.com/ytrock/THuman2.0-Dataset)|
+|hr_v2        |512x512    |8         |20.0GB    |~5500     |[THuman2.1](https://github.com/ytrock/THuman2.0-Dataset), [2K2K](https://github.com/SangHunHan92/2K2K)|
+
+```
+|--- ckpt/
+|    |--- pretrained_weights/
+|    |--- hr_v1/ or hr_v2/
+```
+
+
+## ⚙️ Setup
+### 1. Clone MagicMan
+```bash
+git clone https://github.com/hsil/HumanRecon.git
+cd HumanRecon
+```
+
+### 2. Installation
+```bash
+# Create conda environment
+conda create -n magicman python=3.10
+conda activate magicman
+
+# Install PyTorch and other dependencies
+pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2
+pip install -r requirements.txt
+
+```
+
+## 💫 Inference
+```
+
+```
+
+## 🙏 Acknowledgments
+
+
+## ✏️ Citing
+Please consider citing:
+```BibTeX
+
+```
