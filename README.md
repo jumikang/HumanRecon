@@ -27,13 +27,13 @@
 </div>
 
 
-## 📣 News & TODOs
+## News & TODOs
 - [ ] **[2025.01.xx]** Release inference code and pretrained weights
 - [ ] **[2025.xx.xx]** Release paper and project page
 - [ ] Release reconstruction code.
 - [ ] Release training code.
 
-## 🧰 Models
+## Models
 
 |Model        | Resolution|#Views    |GPU Memery<br>(w/ refinement)|#Training Scans|Datasets|
 |:-----------:|:---------:|:--------:|:--------:|:--------:|:--------:|
@@ -47,8 +47,8 @@
 ```
 
 
-## ⚙️ Setup
-### 1. Clone MagicMan
+## Setup
+### 1. Clone HumanRecon
 ```bash
 git clone https://github.com/hsil/HumanRecon.git
 cd HumanRecon
@@ -66,15 +66,15 @@ pip install -r requirements.txt
 
 ```
 
-## 💫 Inference
+## Inference
 ```
 
 ```
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 
-## ✏️ Citing
+## Citing
 Please consider citing:
 ```BibTeX
 
